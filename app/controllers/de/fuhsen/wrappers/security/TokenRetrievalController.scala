@@ -37,10 +37,13 @@ import play.api.libs.oauth.RequestToken
   */
 class TokenRetrievalController @Inject() (ws: WSClient) extends Controller{
 
-  val KEY: ConsumerKey = ConsumerKey(ConfigFactory.load.getString("xing.app.key"),ConfigFactory.load.getString("xing.app.secret"))
-  val XING:OAuth = OAuth(ServiceInfo( ConfigFactory.load.getString("xing.request_code.url"),
-    ConfigFactory.load.getString("xing.cod2accestoken.url"),
-    ConfigFactory.load.getString("xing.authorize.url"), KEY))
+  //val KEY: ConsumerKey = ConsumerKey(ConfigFactory.load.getString("xing.app.key"),ConfigFactory.load.getString("xing.app.secret"))
+  //val XING:OAuth = OAuth(ServiceInfo( ConfigFactory.load.getString("xing.request_code.url"),
+  //  ConfigFactory.load.getString("xing.cod2accestoken.url"),
+  //  ConfigFactory.load.getString("xing.authorize.url"), KEY))
+
+  val KEY: ConsumerKey = ConsumerKey("","")
+  val XING:OAuth = OAuth(ServiceInfo("","","", KEY))
 
   def getToken(provider:String) = Action { request =>
 

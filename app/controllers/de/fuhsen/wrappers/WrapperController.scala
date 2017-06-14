@@ -185,7 +185,10 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
       return to_return
   }
 
-  def edsa_demand_search(edsaWrapperId: String) = Action {
+  def suply_analysis(edsaWrapperId: String) = Action {
+
+    Logger.info("STARTING SUPPLY")
+
     var requestMerger = new RequestMerger()
     val wrapper = WrapperController.wrapperMap.get(edsaWrapperId).get
     var exists_next_page = true
@@ -221,26 +224,30 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
     }
 
     val serializedN3:String = requestMerger.serializeMergedModel(Lang.N3)
-    var res_dydra = Await.result(push2Dydra(serializedN3), Duration.Inf)
+    var res_dydra = Await.result(push2Dydra(serializedN3, "http://www.edsa-project.eu/edsa/supply"), Duration.Inf)
 
-    Ok("FINISHED DEMAND")
+    Logger.info("FINISHED SUPPLY")
+    Ok("FINISHED SUPPLY")
   }
 
-  def push2Dydra(n3_model: String): Future[String] = {
+  def push2Dydra(n3_model: String, graph: String): Future[String] = {
     val dydra_push_response =
       ws.url(ConfigFactory.load.getString("dydra.endpoint.url"))
-        .withQueryString("auth_token"->ConfigFactory.load.getString("dydra.token")).withQueryString("graph"->"http://www.edsa-project.eu/edsa").withHeaders("Content-Type"->"text/rdf+n3").post(n3_model).map(
+        .withQueryString("auth_token"->ConfigFactory.load.getString("dydra.token")).withQueryString("graph"-> graph).withHeaders("Content-Type"->"text/rdf+n3").post(n3_model).map(
         response => "DYDRA.RESPONSE: "+response.body
       )
 
     dydra_push_response
   }
 
-  def edsa_search(edsaWrapperId: String) = Action {
+  def demand_analysis(edsaWrapperId: String) = Action {
+
+    Logger.info("STARTING DEMAND")
+
     val model_skills: Model = ModelFactory.createDefaultModel()
 
     //Step 1) Load Skills and Country
-    model_skills.read("EDSA_docs/skillNames_temp.ttl")
+    model_skills.read("EDSA_docs/skillNames.ttl")
     val skill_list = ListBuffer[String]()
     val skillsQuery = QueryFactory.create(
       s"""
@@ -272,6 +279,9 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
         case None =>
       }
     }
+
+    Logger.info(s"Keywords: $skill_list and Countries: $country_list")
+
     var requestMerger = new RequestMerger()
     val wrapper = WrapperController.wrapperMap.get(edsaWrapperId).get
 
@@ -317,20 +327,16 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
         }
       }
 
-      val serializedN3:String = requestMerger.serializeMergedModel(Lang.N3)
+      val serializedN3 : String = requestMerger.serializeMergedModel(Lang.N3)
       //println(serializedN3)
-      var res_dydra = Await.result(push2Dydra(serializedN3), Duration.Inf)
-      print("FINISHED: " + x + " - " + y + " - " + res_dydra)
+      var res_dydra = Await.result(push2Dydra(serializedN3, "http://www.edsa-project.eu/edsa/demand"), Duration.Inf)
+      Logger.info("FINISHED: " + x + " - " + y + " - " + res_dydra)
       requestMerger = new RequestMerger()
     }
-//    val json_model = requestMerger.serializeMergedModel(Lang.JSONLD)
-//    val pw = new PrintWriter(new File("EDSA_docs/complete.ttl"))
-//    pw.write(json_model)
-//    pw.close
 
-    //push2Dydra(requestMerger.serializeMergedModel(Lang.N3))
-
+    Logger.info("FINISHING DEMAND")
     Ok("FINISHED")
+
   }
 
   private def geonamesEnrichment(model: Model): Model = {
@@ -382,31 +388,31 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
   private def countryToISO8601(country: String): Option[String] = {
     country match {
       case "Germany" => Some("de")
-//      case "United Kingdom" => Some("gb") //Jooble is uk?
-//      case "France" => Some("fr")
-//      case "Netherlands" => Some("nl")
-//      case "Poland" => Some("pl")
-//      case "Russia" => Some("ru")
-//      case "Romania" => Some("ro")
-//      case "Belarus" => Some("by")
-//      case "Ukraine" => Some("ua")
-//      case "Bosnia and Herzegovina" => Some("ba")
-//      case "Slovakia" => Some("sk")
-//      case "Czech Republic" => Some("cz")
-//      case "Austria" => Some("at")
-//      case "Belgium" => Some("be")
-//      case "Denmark" => Some("dk")
-//      case "Switzerland" => Some("ch")
-//      case "Ireland" => Some("ie")
-//      case "Hungary" => Some("hu")
-//      case "Bulgaria" => Some("bg")
-//      case "Portugal" => Some("pt")
-//      case "Spain" => Some("es")
-//      case "Finland" => Some("fi")
-//      case "Greece" => Some("gr")
-//      case "Sweden" => Some("se")
-//      case "Norway" => Some("no")
-//      case "Croatia" => Some("hr")
+      case "United Kingdom" => Some("gb") //Jooble is uk?
+      case "France" => Some("fr")
+      case "Netherlands" => Some("nl")
+      case "Poland" => Some("pl")
+      case "Russia" => Some("ru")
+      case "Romania" => Some("ro")
+      case "Belarus" => Some("by")
+      case "Ukraine" => Some("ua")
+      case "Bosnia and Herzegovina" => Some("ba")
+      case "Slovakia" => Some("sk")
+      case "Czech Republic" => Some("cz")
+      case "Austria" => Some("at")
+      case "Belgium" => Some("be")
+      case "Denmark" => Some("dk")
+      case "Switzerland" => Some("ch")
+      case "Ireland" => Some("ie")
+      case "Hungary" => Some("hu")
+      case "Bulgaria" => Some("bg")
+      case "Portugal" => Some("pt")
+      case "Spain" => Some("es")
+      case "Finland" => Some("fi")
+      case "Greece" => Some("gr")
+      case "Sweden" => Some("se")
+      case "Norway" => Some("no")
+      case "Croatia" => Some("hr")
       case _ => None
     }
   }
@@ -778,25 +784,6 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
   */
 object WrapperController {
   val wrapperMap = Map[String, RestApiWrapperTrait](
-    //Social Networks
-    "gplus" -> new GooglePlusWrapper(),
-    "twitter" -> new TwitterWrapper(),
-    "facebook" -> new FacebookWrapper(),
-    //Knowledge base
-    "gkb" -> new GoogleKnowledgeGraphWrapper(),
-    //eCommerce
-    "ebay" -> new EBayWrapper(),
-    //Darknet
-    "tor2web" -> new Tor2WebWrapper(),
-    //Linked leaks
-    "linkedleaks" -> new LinkedLeaksWrapper(),
-    //OCCRP
-    "occrp" -> new OCCRPWrapper(),
-    //Xing
-    "xing" -> new XingWrapper(),
-    //Elastic Search
-    "elasticsearch" -> new ElasticSearchWrapper(),
-
     //EDSA WRAPPERS:
     //ADZUNA
     "adzuna" -> new AdzunaWrapper(),
