@@ -38,7 +38,7 @@ import javax.xml.crypto.dsig.SignatureMethod;
 
 public class Application extends Controller {
 
-    private String keyword;
+    private String keyword; //
 
     public Result index() {
         return ok(index.render());
@@ -47,14 +47,6 @@ public class Application extends Controller {
     public Result TokenLifeLength(String wrapperId) {
         String life_length = "{ \"life_length\" : \""+TokenManager.getTokenLifeLength(wrapperId)+"\" }";
         return ok(life_length);
-    }
-
-    public Result results() {
-        return ok(results.render());
-    }
-
-    public Result details() {
-        return ok(details.render());
     }
 
     public Result getKeyword(){

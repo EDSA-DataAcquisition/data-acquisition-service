@@ -4,27 +4,7 @@
 
 # User Interface routes
 GET     /                                                   controllers.Application.index()
-GET     /results                                            controllers.Application.results()
-GET     /details                                            controllers.Application.details()
 GET     /keyword                                            controllers.Application.getKeyword()
-GET     /screenshot                                         controllers.de.fuhsen.engine.ScreenshotController.screenshots(url: String)
-
-# Search Engine API routes
-POST    /engine/api/searches                                controllers.de.fuhsen.engine.SearchEngineController.startSession(query: String)
-GET     /engine/api/searches/:uid/results                   controllers.de.fuhsen.engine.SearchEngineController.search(uid: String, entityType: String, facets: Option[String], sources: String, types: String)
-DELETE  /engine/api/searches/:uid                           controllers.de.fuhsen.engine.SearchEngineController.stopSession(uid: String)
-GET     /engine/api/searches/:uid/facets                    controllers.de.fuhsen.engine.FacetsController.getFacets(uid: String, entityType: String)
-GET     /engine/api/searches/:uid/facets/:facet             controllers.de.fuhsen.engine.FacetsController.getFacetValues(uid: String, facet: String, entityType: String)
-
-#Mini-task services enriching the results graph
-POST    /engine/api/queryprocessing                         controllers.de.fuhsen.engine.QueryProcessingController.execute
-POST    /engine/api/federatedquery                          controllers.de.fuhsen.engine.FederatedQueryController.execute
-POST    /engine/api/entitysummarization                     controllers.de.fuhsen.engine.EntitySummarizationController.execute
-POST    /engine/api/semanticranking                         controllers.de.fuhsen.engine.SemanticRankingController.execute
-
-# Global Schema API routes
-GET     /engine/api/schema/datasources                      controllers.de.fuhsen.engine.SchemaController.getSourceList
-GET     /engine/api/schema/entitytypes                      controllers.de.fuhsen.engine.SchemaController.getEntityTypeList
 
 # REST API Wrappers
 GET     /ldw/restApiWrapper/id/:wrapperId/search            controllers.de.fuhsen.wrappers.WrapperController.search(wrapperId: String, query: String)
@@ -44,14 +24,6 @@ GET     /edsa/rdf2json                                      controllers.de.fuhse
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file                                       controllers.Assets.versioned(path="/public", file: Asset)
 GET     /webjars/*file                                      controllers.WebJarAssets.at(file)
-
-
-# Crawling
-GET     /crawling/jobs                                      controllers.de.fuhsen.crawling.CrawlerController.crawlJobs
-GET     /crawling/jobs/:crawlId                             controllers.de.fuhsen.crawling.CrawlerController.crawlJobsByCrawlId(crawlId: String)
-GET     /crawling/jobs/:crawlId/progress                    controllers.de.fuhsen.crawling.CrawlerController.crawlJobProgressByCrawlId(crawlId: String)
-GET     /crawling/jobs/:crawlId/status                      controllers.de.fuhsen.crawling.CrawlerController.crawlStatusByCrawlId(crawlId: String)
-POST    /crawling/jobs/create                               controllers.de.fuhsen.crawling.CrawlerController.createCrawlJob
 
 # QMine
 GET     /qminer/sent                                        controllers.de.fuhsen.wrappers.QMinerController.send
