@@ -75,8 +75,7 @@ public class Application extends Controller {
                 return "NOT OK "+conn.getResponseCode()+" "+conn.getResponseMessage();
             }
             else {
-                BufferedReader br = new BufferedReader(new InputStreamReader(
-                        (conn.getInputStream())));
+                BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream()), "UTF-8"));
 
                 String finalOutput = "";
                 String output;

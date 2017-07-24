@@ -15,7 +15,6 @@
  */
 package controllers.de.fuhsen.wrappers
 
-import java.io._
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
@@ -30,19 +29,19 @@ import org.apache.jena.riot.Lang
 import org.apache.jena.sparql.core.Quad
 import play.Logger
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
-import play.api.libs.json.{JsArray, JsString, JsValue, Json}
+import play.api.libs.json._
 import play.api.libs.oauth.OAuthCalculator
 import play.api.libs.ws.{WSClient, WSRequest, WSResponse}
 import play.api.mvc.{Action, Controller, Result}
 import utils.dataintegration.RDFUtil._
-import utils.dataintegration.{RDFUtil, RequestMerger, UriTranslator}
+import utils.dataintegration.{RequestMerger, UriTranslator}
 import controllers.de.fuhsen.common.{ApiError, ApiResponse, ApiSuccess}
-import play.api.libs.json.Json.{parse, _}
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.concurrent.{Await, Future}
-import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
+import scala.collection.JavaConversions.asScalaIterator
+import scala.xml.Elem
 
 /**
   * Handles requests to API wrappers. Wrappers must at least implement [[RestApiWrapperTrait]].
@@ -317,7 +316,13 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
               case 1 => page_count += 1 //No deberia pasar nunca.
             }
             //Step 4) Enrichment
-            requestMerger.addWrapperResult(geonamesEnrichment(current_model), wrapper.sourceUri)
+            //val modelWithGeo =
+            val modelWithGeo = geonamesEnrichment(current_model)
+            Logger.info("Size modelwithGeo: "+modelWithGeo.size)
+            val modelWithSkills = skillsEnrichment(current_model)
+            val finalModel = modelWithGeo.add(modelWithSkills)
+            Logger.info("Size finalModel: "+finalModel.size)
+            requestMerger.addWrapperResult(finalModel, wrapper.sourceUri)
             //Call here gate embedded
 
           case ApiError(status, message) =>
@@ -340,49 +345,59 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
   }
 
   private def geonamesEnrichment(model: Model): Model = {
-    var iter:StmtIterator = model.listStatements(null, model.createProperty("http://schema.org/jobLocation"), null);
 
-    val future_statements = ListBuffer[Future[Model]]()
-    val complete_model = ModelFactory.createDefaultModel()
+    if (ConfigFactory.defaultApplication.getBoolean("enrichment.geonames.enabled")) {
+      Logger.info("GeoNames Enrichment Process")
+      var iter: StmtIterator = model.listStatements(null, model.createProperty("http://schema.org/jobLocation"), null);
 
-    while (iter.hasNext()) {
-      var stmt:Statement      = iter.nextStatement();  // get next statement
-      var subject:Resource   = stmt.getSubject();     // get the subject
-      var predicate:Property = stmt.getPredicate();   // get the predicate
-      var rdf_object:RDFNode = stmt.getObject();      // get the object
+      val future_statements = ListBuffer[Future[Model]]()
+      val complete_model = ModelFactory.createDefaultModel()
 
-      val future_stm =
+      while (iter.hasNext()) {
+        var stmt: Statement = iter.nextStatement();
+        // get next statement
+        var subject: Resource = stmt.getSubject();
+        // get the subject
+        var predicate: Property = stmt.getPredicate();
+        // get the predicate
+        var rdf_object: RDFNode = stmt.getObject(); // get the object
+
+        val future_stm =
           ws.url(ConfigFactory.load.getString("geonames.search.url"))
-          .withQueryString("q"->rdf_object.asLiteral().getString,
-                           "formatted"-> "true",
-                           "maxRows"->"10",
-                           "username"->"camilom",
-                           "style"->"full").get.map(
-          response => {
-            val new_model = ModelFactory.createDefaultModel()
-            val lat = (((Json.parse(response.body) \ "geonames") (0) \ "lat").get).toString()
-            val lng = (((Json.parse(response.body) \ "geonames") (0) \ "lng").get).toString()
+            .withQueryString("q" -> rdf_object.asLiteral().getString,
+              "formatted" -> "true",
+              "maxRows" -> "10",
+              "username" -> "camilom",
+              "style" -> "full").get.map(
+            response => {
+              val new_model = ModelFactory.createDefaultModel()
+              val lat = (((Json.parse(response.body) \ "geonames") (0) \ "lat").get).toString()
+              val lng = (((Json.parse(response.body) \ "geonames") (0) \ "lng").get).toString()
 
-            new_model.add(ResourceFactory.createStatement(subject, ResourceFactory.createProperty("http://schema.org/jobLocation_fuhsen_LAT"), ResourceFactory.createTypedLiteral(lat)))
-            new_model.add(ResourceFactory.createStatement(subject, ResourceFactory.createProperty("http://schema.org/jobLocation_fuhsen_LNG"), ResourceFactory.createTypedLiteral(lng)))
-            new_model
+              new_model.add(ResourceFactory.createStatement(subject, ResourceFactory.createProperty("http://schema.org/jobLocation_fuhsen_LAT"), ResourceFactory.createTypedLiteral(lat)))
+              new_model.add(ResourceFactory.createStatement(subject, ResourceFactory.createProperty("http://schema.org/jobLocation_fuhsen_LNG"), ResourceFactory.createTypedLiteral(lng)))
+              new_model
+            }
+          )
+
+        future_statements += future_stm
+
+        future_stm.map {
+          res => {
+            complete_model.add(res)
           }
-        )
-
-      future_statements += future_stm
-
-      future_stm.map {
-        res => {
-          complete_model.add(res)
         }
       }
 
+      val f = Future.sequence(future_statements)
+      Await.ready(f, Duration.Inf)
+
+      complete_model.add(model)
+
     }
+    else
+      model
 
-    val f = Future.sequence(future_statements)
-    Await.ready(f, Duration.Inf)
-
-    complete_model.add(model)
   }
 
   private def countryToISO8601(country: String): Option[String] = {
@@ -417,58 +432,91 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
     }
   }
 
+  private def skillsEnrichment(model: Model) : Model = {
+    if (ConfigFactory.defaultApplication.getBoolean("enrichment.skills.enabled")) {
+      Logger.info("Skills Enrichment Process")
+      val _json = prepareAnnotationServiceJson(model)
+      queryAnnotationServiceJson(_json)
+    }
+    else
+      ModelFactory.createDefaultModel() //Retuning empty model
+  }
+
+  implicit val tasksWrites = new Writes[Skill] {
+    def writes(skill: Skill) = Json.obj(
+      "label" -> skill.label,
+      "jobDescription" -> skill.jobDescription
+    )
+  }
+
+  private def prepareAnnotationServiceJson(model: Model) : JsValue = {
+    val query = s"""
+                  PREFIX edsa: <http://www.edsa-project.eu/edsa#>
+                  PREFIX sdo: <http://schema.org/>
+                  PREFIX saro: <http://www.semanticweb.org/elisasibarani/ontologies/2016/0/untitled-ontology-51#>
+
+                  SELECT ?id ?label ?description
+                  WHERE
+                  {
+                    ?s a edsa:JobPosting .
+                    ?s saro:id ?id .
+                    ?s sdo:title ?label .
+                    ?s sdo:description ?description .
+                  }
+                """
+    val results = QueryExecutionFactory.create(query, model).execSelect()
+    val seq = results.map(r => new Skill(r.getLiteral("id").getString, r.getLiteral("label").getString+" "+r.getLiteral("description").getString)).toList
+    Json.obj("tasks" -> Json.toJson(seq))
+  }
+
+  private def queryAnnotationServiceJson(json: JsValue) : Model = {
+    val model = ModelFactory.createDefaultModel()
+
+    val future = ws.url(ConfigFactory.defaultApplication.getString("enrichment.skills.url"))
+        .withHeaders("Content-Type" -> "application/json")
+          .post(json).map( response => model.add(createRdfAnnotationModel(response.xml)))
+
+    //Line required to sync with other thread, but it is not a good practice replace this in the next version
+    Await.ready(future, Duration.Inf)
+
+    Logger.info("Skill Model Size: "+model.size)
+    model
+  }
+
+  private def createRdfAnnotationModel(annotations: Elem) : Model = {
+
+    val model = ModelFactory.createDefaultModel()
+    val docs = (annotations \ "GateDocument" \ "AnnotationSet").filter(!_.attribute("Name").isEmpty)
+    docs.map { r =>
+      val jobPostUri = "http://www.edsa-project.eu/jobpost/" + r.attribute("Name").get
+      var skillId = ""
+      (r \ "Annotation" \ "Feature").map { f =>
+        val name = (f \ "Name").text
+        val value = (f \ "Value").text
+        if (name == "string") {
+          Logger.info("Skill detected: "+value)
+          model.createResource(jobPostUri)
+            .addProperty(model.createProperty("http://www.edsa-project.eu/edsa#requiresSkill"), "http://www.edsa-project.eu/skill/"+value)
+          skillId = value
+        }
+        else {
+          if (skillId != "") {
+            model.createResource("http://www.edsa-project.eu/skill/"+skillId)
+              .addProperty(model.createProperty("http://www.edsa-project.eu/edsa#"+name), value)
+          }
+        }
+      }
+    }
+    Logger.info("Skills Model Size: "+model.size)
+    model
+  }
+
   private def execQueryAgainstWrapper(query: String, wrapper: RestApiWrapperTrait, page: Option[String], country: Option[String]): Future[ApiResponse] = {
     val apiRequest = createApiRequest(wrapper, query, page: Option[String], country: Option[String])
     val apiResponse = executeApiRequest(apiRequest, wrapper)
     val customApiResponse = customApiHandling(wrapper, apiResponse)
     transformApiResponse(wrapper, customApiResponse, query, country, page)
   }
-
-  /**
-    * Returns the merged result from multiple wrappers in N-Quads format.
-    *
-    * @param query      for each wrapper
-    * @param wrapperIds a comma-separated list of wrapper ids
-    */
-  def searchMultiple(query: String, wrapperIds: String) = Action.async {
-    val wrappers = (wrapperIds.split(",") map (WrapperController.wrapperMap.get)).toSeq
-    if (wrappers.exists(_.isEmpty)) {
-      Future(BadRequest("Invalid wrapper requested! Supported wrappers: " +
-        WrapperController.sortedWrapperIds.mkString(", ")))
-    } else {
-      fetchAndIntegrateWrapperResults(wrappers, query)
-    }
-  }
-
-  /**
-    * Returns the merged result from multiple wrappers in JSON-LD format.
-    *
-    * @param query for each wrapper
-    * @param wrapperIds a comma-separated list of wrapper ids
-    */
-  def searchMultiple2(query: String, wrapperIds: String) = Action.async {
-    val wrappers = (wrapperIds.split(",") map (WrapperController.wrapperMap.get)).toSeq
-    if(wrappers.exists(_.isEmpty)) {
-      Future(BadRequest("Invalid wrapper requested! Supported wrappers: " +
-        WrapperController.sortedWrapperIds.mkString(", ")))
-    } else {
-      val requestMerger = new RequestMerger()
-      val resultFutures = wrappers.flatten map (wrapper => execQueryAgainstWrapper(query, wrapper, None, None))
-      Future.sequence(resultFutures) map { results =>
-        for ((wrapperResult, wrapper) <- results.zip(wrappers.flatten)) {
-          wrapperResult match {
-            case ApiSuccess(responseBody) => Logger.debug("POST-SILK:"+responseBody)
-              val model = rdfStringToModel(responseBody, Lang.TURTLE.getName) //Review
-              requestMerger.addWrapperResult(model, wrapper.sourceUri)
-            case _: ApiError =>
-          }
-        }
-        //val resultDataset = requestMerger.constructQuadDataset()
-        Ok(requestMerger.serializeMergedModel(Lang.NTRIPLES))
-      }
-    }
-  }
-
 
   /**
     * Link and merge entities from different sources.
@@ -791,7 +839,6 @@ object WrapperController {
     "indeed" -> new IndeedWrapper(),
     //JOOBLE
     "jooble" -> new JoobleWrapper(),
-
     //EDSA - DEMAND (Courses):
     //OPEN EDX
     "openedx"-> new OpenEDXWrapper(),
@@ -801,3 +848,6 @@ object WrapperController {
 
   val sortedWrapperIds = wrapperMap.keys.toSeq.sortWith(_ < _)
 }
+
+case class Skill (label: String, jobDescription: String)
+case class AnnotateSkill (uri: String, label: String, frequencyOfMention: Int, skillType: String)

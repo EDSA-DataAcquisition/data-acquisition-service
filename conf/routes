@@ -7,8 +7,6 @@ GET     /                                                   controllers.Applicat
 GET     /keyword                                            controllers.Application.getKeyword()
 
 # REST API Wrappers
-GET     /ldw/restApiWrapper/id/:wrapperId/search            controllers.de.fuhsen.wrappers.WrapperController.search(wrapperId: String, query: String)
-GET     /ldw/restApiWrapper/search                          controllers.de.fuhsen.wrappers.WrapperController.searchMultiple2(query: String, wrapperIds: String)
 GET     /ldw/restApiWrapper                                 controllers.de.fuhsen.wrappers.WrapperController.wrapperIds()
 
 GET     /:wrapperId/getToken                                controllers.de.fuhsen.wrappers.security.TokenRetrievalController.getToken(wrapperId: String)
@@ -23,7 +21,6 @@ GET     /edsa/rdf2json                                      controllers.de.fuhse
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file                                       controllers.Assets.versioned(path="/public", file: Asset)
-GET     /webjars/*file                                      controllers.WebJarAssets.at(file)
 
 # QMine
 GET     /qminer/sent                                        controllers.de.fuhsen.wrappers.QMinerController.send
