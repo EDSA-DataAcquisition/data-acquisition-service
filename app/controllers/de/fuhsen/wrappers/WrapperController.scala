@@ -635,10 +635,10 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
                                    page: Option[String]): Future[ApiResponse] = {
     if(wrapper.sourceLocalName.equals("jooble")) {
       val joobleResponse = new Application().postRequest(query, country.get, page.get)
-      Logger.debug("PRE-SILK (JOOBLE): "+joobleResponse )
+      //Logger.debug("PRE-SILK (JOOBLE): "+joobleResponse )
       handleSilkTransformation(wrapper, joobleResponse.replace("\\r", ""))
     }else{
-      Logger.debug("PRE-SILK: "+ apiResponse.value )
+      //Logger.debug("PRE-SILK: "+ apiResponse.value )
       apiResponse.flatMap {
         case error: ApiError =>
           // There has been an error previously, don't go on.
@@ -646,10 +646,10 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
         case ApiSuccess(body) =>
           if(wrapper.sourceLocalName.equals("indeed")){
             val bodyS = body.replace("<?xml version='1.0' encoding='UTF-8'?>","")
-            Logger.info("PRE-SILKK: "+bodyS)
+            //Logger.info("PRE-SILKK: "+bodyS)
             handleSilkTransformation(wrapper, bodyS)
           } else{
-            Logger.debug("PRE-SILK: "+body)
+            //Logger.debug("PRE-SILK: "+body)
             handleSilkTransformation(wrapper, body)
           }
       }

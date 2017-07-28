@@ -133,7 +133,31 @@ class QMinerController @Inject()(ws: WSClient) extends Controller {
   }
 
   private def convert2Json(model: String): JsValue = {
-    null
+    val json: JsValue = JsObject(Seq(
+      "date" -> JsString("2017-10-02T05:24:32Z"),
+      "description" -> JsString("... availability and consistency for all stakeholders"),
+      "title" -> JsString("Data Warehouse Engineer Master Blaster"),
+      "uri" -> JsString("some uri"),
+      "url" -> JsString("some url"),
+      "inLocation" -> JsObject(
+          Seq("name" -> JsString("some name"),
+              "long" -> JsNumber(-1.309197),
+              "uri" -> JsString("Some uri")
+          )),
+      "residents" -> JsArray(IndexedSeq(
+        JsObject(Seq(
+          "name" -> JsString("Fiver"),
+          "age" -> JsNumber(4),
+          "role" -> JsNull
+        )),
+        JsObject(Seq(
+          "name" -> JsString("Bigwig"),
+          "age" -> JsNumber(6),
+          "role" -> JsString("Owsla")
+        ))
+      ))
+    ))
+    json
   }
 
 }

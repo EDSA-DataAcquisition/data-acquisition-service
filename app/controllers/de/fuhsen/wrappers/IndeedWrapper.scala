@@ -62,7 +62,7 @@ class IndeedWrapper extends RestApiWrapperTrait with SilkTransformableTrait {
     SilkTransformationTask(
       transformationTaskId = "IndeedTransformationTask",
       createSilkTransformationRequestBody(
-        basePath = "/response/results/result",
+        basePath = "/results/result",
         uriPattern = "http://www.edsa-project.eu/jobpost/{jobkey}"
       )
     )
