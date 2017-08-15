@@ -223,7 +223,7 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
     }
 
     val serializedN3:String = requestMerger.serializeMergedModel(Lang.N3)
-    var res_dydra = Await.result(push2Dydra(serializedN3, "http://www.edsa-project.eu/edsa/supply"), Duration.Inf)
+    var res_dydra = Await.result(push2Dydra(serializedN3, ConfigFactory.load.getString("dydra.supply_analysis.graph")), Duration.Inf)
 
     Logger.info("FINISHED SUPPLY")
     Ok("FINISHED SUPPLY")
@@ -239,7 +239,7 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
     dydra_push_response
   }
 
-  def demand_analysis(edsaWrapperId: String) = Action {
+  def demand_analysis(edsaWrapperId: String, country: Option[String]) = Action {
 
     Logger.info("STARTING DEMAND")
 
@@ -260,23 +260,29 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
       skill_list.append(resultSet_skills.next.get("skill").toString)
     }
 
-    val model: Model = ModelFactory.createDefaultModel()
-    model.read("EDSA_docs/countries_europe_eu_member_status.rdf")
     val country_list = ListBuffer[String]()
 
-    val keywordQuery = QueryFactory.create(
-      s"""
-         |PREFIX gn:<http://www.geonames.org/ontology#>
-         |SELECT ?country WHERE {
-         |?s gn:name ?country .
-         |}
+    country match {
+      case Some(value) =>
+        country_list.append(value)
+      case None =>
+        val model: Model = ModelFactory.createDefaultModel()
+        model.read("EDSA_docs/countries_europe_eu_member_status.rdf")
+
+        val keywordQuery = QueryFactory.create(
+          s"""
+             |PREFIX gn:<http://www.geonames.org/ontology#>
+             |SELECT ?country WHERE {
+             |?s gn:name ?country .
+             |}
       """.stripMargin)
-    val resultSet = QueryExecutionFactory.create(keywordQuery, model).execSelect()
-    while (resultSet.hasNext) {
-      countryToISO8601(resultSet.next.get("country").toString) match {
-        case Some(value) => country_list.append(value)
-        case None =>
-      }
+        val resultSet = QueryExecutionFactory.create(keywordQuery, model).execSelect()
+        while (resultSet.hasNext) {
+          countryToISO8601(resultSet.next.get("country").toString) match {
+            case Some(value) => country_list.append(value)
+            case None =>
+          }
+        }
     }
 
     Logger.info(s"Keywords: $skill_list and Countries: $country_list")
@@ -334,7 +340,7 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
 
       val serializedN3 : String = requestMerger.serializeMergedModel(Lang.N3)
       //println(serializedN3)
-      var res_dydra = Await.result(push2Dydra(serializedN3, "http://www.edsa-project.eu/edsa/demand"), Duration.Inf)
+      var res_dydra = Await.result(push2Dydra(serializedN3, ConfigFactory.load.getString("dydra.demand_analysis.graph")+"/"+wrapper.sourceLocalName), Duration.Inf)
       Logger.info("FINISHED: " + x + " - " + y + " - " + res_dydra)
       requestMerger = new RequestMerger()
     }

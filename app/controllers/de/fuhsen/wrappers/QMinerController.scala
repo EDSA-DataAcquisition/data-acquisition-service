@@ -3,12 +3,13 @@ package controllers.de.fuhsen.wrappers
 import javax.inject.Inject
 
 import com.typesafe.config.ConfigFactory
-import org.apache.jena.rdf.model.Model
 import play.api.Logger
-import play.api.libs.json._
-import play.api.libs.ws.WSClient
+import play.api.libs.json.{JsValue, Json}
+import play.api.libs.ws.{WSClient, WSResponse}
 import play.api.mvc.{Action, Controller}
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
+
+import scala.concurrent.Future
 
 /**
   * Created by dcollarana on 5/19/2017.
@@ -16,100 +17,31 @@ import play.api.libs.concurrent.Execution.Implicits.defaultContext
 class QMinerController @Inject()(ws: WSClient) extends Controller {
 
   def send = Action.async {
-    val data = Json.parse(
-      """
-        |[{
-        |		"date": "2017-10-02T05:24:32Z",
-        |		"description": "... availability and consistency for all stakeholders. About you : Bachelor\u2019s / master\u2019s degree in a STEM discipline or relevant work experience in the field of scientific <strong>computing<\/strong>. Possess ...  <strong>advanced<\/strong> skills in SQL, PostgreSQL or Python. Well versed in relational databases, data and data analysis. Proficient in handling large data sets and ideally have experience in data ...",
-        |		"title": "Data Warehouse Engineer Master Blaster",
-        |		"uri": "eyJhbGciOiJIUzI1NiJ0.eyJzIjoiZUFzTmhhYkpSNXVsSTJjTUREazBFZyIsImkiOiI0NDMzNTA0NzcifQ.nq-m-g-hZ3u1CQP0Um3EV6cosjv0C3peVXlluV8hwxc",
-        |		"url": "https://www.adzuna.de/land/ad/443350477?se=eAsNhabJR5ulI2cMDDk0Eg&utm_medium=api&utm_source=bf155b6a&v=E2048EFE2E9F3342709D855CEA5FED6917E9681A",
-        |		"inLocation": {
-        |			"name": "Seehof",
-        |			"coord": [52.47122, 13.32833],
-        |			"uri": "http://sws.geonames.org/2833755"
-        |		},
-        |		"inCountry": {
-        |			"name": "Germany",
-        |			"coord": [52.47122, 13.32833],
-        |			"uri": "http://sws.geonames.org/2921044"
-        |		},
-        |		"foundIn": {
-        |			"name": "Jooble"
-        |		},
-        |		"requiredSkills": [{
-        |			"name": "data warehouse",
-        |			"uri": "http://www.edsa-project.eu/skill/data warehouse"
-        |		}],
-        |		"forOrganization": {
-        |			"title": "Blacklane GmbH"
-        |		}
-        |	},
-        |	{
-        |		"date": "2016-10-02T05:24:32Z",
-        |		"description": "...  availability and consistency for all stakeholders. About you : Bachelor\u2019s / master\u2019s degree in a STEM discipline or relevant work experience in the field of scientific <strong>computing<\/strong>. Possess ...  <strong>advanced<\/strong> skills in SQL, PostgreSQL or Python. Well versed in relational databases, data and data analysis. Proficient in handling large data sets and ideally have experience in data ...",
-        |		"title": "Data Warehouse Engineer (f/m)",
-        |		"uri": "eyJhbGciOiJIUzI1NiJ9.eyJzIjoiZUFzTmhhYkpSNXVsSTJjTUREazBFZyIsImkiOiI0NDMzNTA0NzcifQ.nq-m-g-hZ3u1CQP0Um3EV6cosjv0C3peVXlluV8hwxc",
-        |		"url": "https://www.adzuna.de/land/ad/443350477?se=eAsNhabJR5ulI2cMDDk0Eg&utm_medium=api&utm_source=bf155b6a&v=E2048EFE2E9F3342709D855CEA5FED6917E9681F",
-        |		"inLocation": {
-        |			"name": "Seehof",
-        |			"coord": [52.47122, 13.32833],
-        |			"uri": "http://sws.geonames.org/2833755"
-        |		},
-        |		"inCountry": {
-        |			"name": "Germany",
-        |			"coord": [52.47122, 13.32833],
-        |			"uri": "http://sws.geonames.org/2921044"
-        |		},
-        |		"foundIn": {
-        |			"name": "Adzuna"
-        |		},
-        |		"requiredSkills": [{
-        |				"name": "data warehouse",
-        |				"uri": "http://www.edsa-project.eu/skill/data warehouse"
-        |			},
-        |			{
-        |				"name": "sql",
-        |				"uri": "http://www.edsa-project.eu/skill/sql"
-        |			},
-        |			{
-        |				"name": "postgresql",
-        |				"uri": "http://www.edsa-project.eu/skill/postgresql"
-        |			},
-        |			{
-        |				"name": "relational database",
-        |				"uri": "http://www.edsa-project.eu/skill/relational database"
-        |			}
-        |		],
-        |		"foundConcepts": [{
-        |				"name": "Cloud Computing",
-        |				"uri": "http://de.wikipedia.org/wiki/Cloud_Computing"
-        |			},
-        |			{
-        |				"name": "Data-Warehouse",
-        |				"uri": "http://de.wikipedia.org/wiki/Data-Warehouse"
-        |			},
-        |			{
-        |				"name": "Warehouse",
-        |				"uri": "http://de.wikipedia.org/wiki/Warehouse"
-        |			},
-        |			{
-        |				"name": "Toningenieur",
-        |				"uri": "http://de.wikipedia.org/wiki/Toningenieur"
-        |			},
-        |			{
-        |				"name": "Klammer (Zeichen)",
-        |				"uri": "http://de.wikipedia.org/wiki/Klammer_(Zeichen)"
-        |			}
-        |		],
-        |		"forOrganization": {
-        |			"title": "Blacklane GmbH"
-        |		}
-        |	}
-        |]
-      """.stripMargin
-    )
-    Logger.info("Json value sent")
+    //val data = convert2Json("")
+    Logger.info("Sending Json value")
+
+    val futureResponse: Future[WSResponse] = for {
+      responseOne <- ws.url(ConfigFactory.load.getString("dydra.endpoint.sparql"))
+                        .withQueryString("query"->ConfigFactory.load.getString("dydra.sparql.jobposting"))
+                        .withHeaders("Accept"->"application/sparql-results+json")
+                        .get
+      responseTwo <- ws.url(ConfigFactory.load.getString("qminer.endpoint.url"))
+                        .post(convert2Json(responseOne.body))
+    } yield responseTwo
+    //action taken in case of failure
+    futureResponse.recover {
+      case e: Exception =>
+        val exceptionData = Map("error" -> Seq(e.getMessage))
+        Logger.error(exceptionData.toString())
+    }
+    futureResponse.map { response =>
+        if (response.status >= 300) {
+          InternalServerError(s"${response.status} server error in the service")
+        } else
+          Ok
+    }
+
+    /*
     ws.url(ConfigFactory.load.getString("qminer.endpoint.url"))
       .post(data)
       .map( response =>
@@ -118,6 +50,7 @@ class QMinerController @Inject()(ws: WSClient) extends Controller {
         } else
           Ok
       )
+    */
   }
 
   def receive = Action { request =>
@@ -133,30 +66,39 @@ class QMinerController @Inject()(ws: WSClient) extends Controller {
   }
 
   private def convert2Json(model: String): JsValue = {
-    val json: JsValue = JsObject(Seq(
-      "date" -> JsString("2017-10-02T05:24:32Z"),
-      "description" -> JsString("... availability and consistency for all stakeholders"),
-      "title" -> JsString("Data Warehouse Engineer Master Blaster"),
-      "uri" -> JsString("some uri"),
-      "url" -> JsString("some url"),
-      "inLocation" -> JsObject(
-          Seq("name" -> JsString("some name"),
-              "long" -> JsNumber(-1.309197),
-              "uri" -> JsString("Some uri")
-          )),
-      "residents" -> JsArray(IndexedSeq(
-        JsObject(Seq(
-          "name" -> JsString("Fiver"),
-          "age" -> JsNumber(4),
-          "role" -> JsNull
-        )),
-        JsObject(Seq(
-          "name" -> JsString("Bigwig"),
-          "age" -> JsNumber(6),
-          "role" -> JsString("Owsla")
-        ))
-      ))
-    ))
+    val json: JsValue = Json.obj(
+      "date" -> "2017-10-02T05:24:32Z",
+      "description" -> "... availability and consistency for all stakeholders",
+      "title" -> "Data Warehouse Engineer Master Blaster",
+      "uri" -> "some uri",
+      "url" -> "some url",
+      "inLocation" -> Json.obj(
+        "name" -> "some name",
+        "coord" -> "1234",
+        "uri" -> "http://sws.geonames.org/2921055"
+      ),
+      "inCountry" -> Json.obj(
+        "name" -> "Germany",
+        "coord" -> "54321",
+        "uri" -> "http://sws.geonames.org/2921044"
+      ),
+      "foundIn" -> Json.obj(
+        "name" -> "Adzuna"
+      ),
+      "requiredSkills" -> Json.arr(
+        Json.obj(
+          "name" -> "data warehouse",
+          "uri" -> "http://www.edsa-project.eu/skill/data warehouse"
+        ),
+        Json.obj(
+          "name" -> "sql",
+          "uri" -> "http://www.edsa-project.eu/skill/sql"
+        )
+      ),
+      "forOrganization" -> Json.obj(
+        "title" -> "Blacklane GmbH"
+      )
+    )
     json
   }
 

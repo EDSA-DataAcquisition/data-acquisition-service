@@ -58,9 +58,10 @@ public class Application extends Controller {
         try
         {
             URL url = new URL("https://"+country+Play.application().configuration().getString("jooble.search.url")+Play.application().configuration().getString("jooble.search.api_key."+country));
+            //System.out.println(url.toString());
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setDoOutput(true);
-            conn.setRequestMethod("GET");
+            conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
             conn.setRequestProperty("Content-Length", "17");
 

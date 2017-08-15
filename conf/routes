@@ -15,7 +15,7 @@ GET     /:wrapperId/code2tokenX                             controllers.de.fuhse
 GET     /:wrapperId/getTokenLifeLength                      controllers.Application.TokenLifeLength(wrapperId: String)
 
 # EDSA endpoints
-GET     /edsa/:edsaWrapperId/job_search                     controllers.de.fuhsen.wrappers.WrapperController.demand_analysis(edsaWrapperId: String)
+GET     /edsa/:edsaWrapperId/job_search                     controllers.de.fuhsen.wrappers.WrapperController.demand_analysis(edsaWrapperId: String, country: Option[String])
 GET     /edsa/:edsaWrapperId/course_search                  controllers.de.fuhsen.wrappers.WrapperController.suply_analysis(edsaWrapperId: String)
 GET     /edsa/rdf2json                                      controllers.de.fuhsen.wrappers.WrapperController.edsa_rdf2json_transform()
 
