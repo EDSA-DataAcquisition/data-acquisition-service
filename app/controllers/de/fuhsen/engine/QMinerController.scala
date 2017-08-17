@@ -1,13 +1,13 @@
-package controllers.de.fuhsen.wrappers
+package controllers.de.fuhsen.engine
 
 import javax.inject.Inject
 
 import com.typesafe.config.ConfigFactory
 import play.api.Logger
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.{JsValue, Json}
 import play.api.libs.ws.{WSClient, WSResponse}
 import play.api.mvc.{Action, Controller}
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
 
 import scala.concurrent.Future
 
@@ -20,10 +20,19 @@ class QMinerController @Inject()(ws: WSClient) extends Controller {
     //val data = convert2Json("")
     Logger.info("Sending Json value")
 
+    val query = s"""
+         |construct ?s ?p ?o
+         |where { GRAPH <http://www.edsa-project.eu/edsa/demand/adzuna> {
+         | ?s ?p ?o .
+         | ?s <http://schema.org/datePosted> ?date .
+         | FILTER (strdt(?date, xsd:dateTime) > "2017-05-17T00:00:00Z"^^xsd:dateTime)
+         |} }
+          """.stripMargin
+
     val futureResponse: Future[WSResponse] = for {
       responseOne <- ws.url(ConfigFactory.load.getString("dydra.endpoint.sparql"))
-                        .withQueryString("query"->ConfigFactory.load.getString("dydra.sparql.jobposting"))
-                        .withHeaders("Accept"->"application/sparql-results+json")
+                        .withQueryString("query"-> query)
+                        .withHeaders("Accept"->"application/n-triples")
                         .get
       responseTwo <- ws.url(ConfigFactory.load.getString("qminer.endpoint.url"))
                         .post(convert2Json(responseOne.body))
@@ -66,6 +75,7 @@ class QMinerController @Inject()(ws: WSClient) extends Controller {
   }
 
   private def convert2Json(model: String): JsValue = {
+    Logger.info("model: "+model)
     val json: JsValue = Json.obj(
       "date" -> "2017-10-02T05:24:32Z",
       "description" -> "... availability and consistency for all stakeholders",
