@@ -380,8 +380,8 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
               val lat = (((Json.parse(response.body) \ "geonames") (0) \ "lat").get).toString()
               val lng = (((Json.parse(response.body) \ "geonames") (0) \ "lng").get).toString()
 
-              new_model.add(ResourceFactory.createStatement(subject, ResourceFactory.createProperty("http://schema.org/jobLocation_fuhsen_LAT"), ResourceFactory.createTypedLiteral(lat)))
-              new_model.add(ResourceFactory.createStatement(subject, ResourceFactory.createProperty("http://schema.org/jobLocation_fuhsen_LNG"), ResourceFactory.createTypedLiteral(lng)))
+              new_model.add(ResourceFactory.createStatement(subject, ResourceFactory.createProperty("http://www.edsa-project.eu/edsa/wgs84_pos#lat"), ResourceFactory.createTypedLiteral(lat)))
+              new_model.add(ResourceFactory.createStatement(subject, ResourceFactory.createProperty("http://www.edsa-project.eu/edsa/wgs84_pos#long"), ResourceFactory.createTypedLiteral(lng)))
               new_model
             }
           )
