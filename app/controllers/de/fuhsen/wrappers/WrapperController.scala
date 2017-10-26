@@ -322,8 +322,8 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
               case 1 => page_count += 1 //No deberia pasar nunca.
             }
             //Step 4) Enrichment
-            //val modelWithGeo =
-            val modelWithGeo = geonamesEnrichment(current_model)
+            val modelWithCountries = countryEnrichment(current_model, x)
+            val modelWithGeo = geonamesEnrichment(modelWithCountries)
             Logger.info("Model size with Geo: "+modelWithGeo.size)
             val modelWithSkills = skillsEnrichment(current_model)
             val finalModel = modelWithGeo.add(modelWithSkills)
@@ -356,6 +356,21 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
     Logger.info("FINISHING DEMAND")
     Ok("FINISHED")
 
+  }
+
+  private def countryEnrichment(model: Model, countryCode: String) : Model = {
+    Logger.info("Country Enrichment Process")
+    val query = QueryFactory.create(
+      s"""
+         |PREFIX edsa: <http://www.edsa-project.eu/edsa#>
+         |
+         |CONSTRUCT { ?s edsa:countryCode "$countryCode" }
+         |WHERE {
+         |    ?s a edsa:JobPosting .
+         |}
+          """.stripMargin)
+    val modelWithCountries = QueryExecutionFactory.create(query, model).execConstruct()
+    model.add(modelWithCountries)
   }
 
   private def geonamesEnrichment(model: Model): Model = {
