@@ -36,7 +36,7 @@ class QMinerController @Inject()(ws: WSClient) extends Controller {
     "foundIn" -> "http://schema.org/source"
   )
 
-  def send = Action.async {
+  def send(date: String, source:String) = Action.async {
     //val data = convert2Json("")
     Logger.info("Sending Json value")
 
@@ -47,12 +47,12 @@ class QMinerController @Inject()(ws: WSClient) extends Controller {
          |
          |CONSTRUCT ?s ?p ?o
          |where {
-         |  GRAPH <http://www.edsa-project.eu/edsa/demand/adzuna> {
+         |  GRAPH <http://www.edsa-project.eu/edsa/demand/$source> {
          |    ?s a edsa:JobPosting .
          |    ?s ?p ?o .
          |    ?s <http://schema.org/datePosted> ?date .
          |    BIND(strdt(?date, xsd:date) AS ?d)
-         |    FILTER (?d > "2017-04-01"^^xsd:date)
+         |    FILTER (?d > "$date"^^xsd:date)
          |  }
          |}
           """.stripMargin
@@ -73,13 +73,13 @@ class QMinerController @Inject()(ws: WSClient) extends Controller {
     }
     futureResponse.map { response =>
         if (response.status >= 300) {
-          InternalServerError(s"${response.status} server error in the service")
+          InternalServerError(s"${response.status} server error in the service ${response.body}")
         } else
           Ok
     }
   }
 
-  def convertToJson(response:String) : String = {
+  def convertToJson(response:String) : JsValue = {
     val model = RDFUtil.rdfStringToModel(response, Lang.TTL)
     val iterator = model.listSubjects.toList
     var json = JsArray()
@@ -87,8 +87,8 @@ class QMinerController @Inject()(ws: WSClient) extends Controller {
       var jsObject = processStatement(model, x)
       json =  json :+ jsObject
     }
-    Logger.info(json.toString)
-    json.toString
+    //Logger.info(json.toString)
+    json //.toString
   }
 
   def processStatement(model: Model, subj: Resource): JsValue = {

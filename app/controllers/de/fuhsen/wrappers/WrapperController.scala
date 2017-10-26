@@ -34,7 +34,7 @@ import play.api.libs.oauth.OAuthCalculator
 import play.api.libs.ws.{WSClient, WSRequest, WSResponse}
 import play.api.mvc.{Action, Controller, Result}
 import utils.dataintegration.RDFUtil._
-import utils.dataintegration.{RequestMerger, UriTranslator}
+import utils.dataintegration.{RDFUtil, RequestMerger, UriTranslator}
 import controllers.de.fuhsen.common.{ApiError, ApiResponse, ApiSuccess}
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
@@ -287,7 +287,7 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
 
     Logger.info(s"Keywords: $skill_list and Countries: $country_list")
 
-    var requestMerger = new RequestMerger()
+    //var requestMerger = new RequestMerger()
     val wrapper = WrapperController.wrapperMap.get(edsaWrapperId).get
 
     //Step 2) Loop to query the services for skill x country
@@ -324,12 +324,16 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
             //Step 4) Enrichment
             //val modelWithGeo =
             val modelWithGeo = geonamesEnrichment(current_model)
-            Logger.info("Size modelwithGeo: "+modelWithGeo.size)
+            Logger.info("Model size with Geo: "+modelWithGeo.size)
             val modelWithSkills = skillsEnrichment(current_model)
             val finalModel = modelWithGeo.add(modelWithSkills)
-            Logger.info("Size finalModel: "+finalModel.size)
-            requestMerger.addWrapperResult(finalModel, wrapper.sourceUri)
-            //Call here gate embedded
+
+            //Step 5) Storing
+            Logger.info("Storing final model: "+finalModel.size)
+            var res_dydra = Await.result(push2Dydra(RDFUtil.modelToTripleString(finalModel, Lang.N3), ConfigFactory.load.getString("dydra.demand_analysis.graph")+"/"+wrapper.sourceLocalName), Duration.Inf)
+            Logger.info("Stored: "+ res_dydra)
+            //Removed because we store in every result page
+            //requestMerger.addWrapperResult(finalModel, wrapper.sourceUri)
 
           case ApiError(status, message) =>
             Logger.error("ERROR: Executing the query returned a status code of" + status + " - Message: " + message)
@@ -338,11 +342,15 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
         }
       }
 
+      //Removed because we store in every result page
+      /*
       val serializedN3 : String = requestMerger.serializeMergedModel(Lang.N3)
-      //println(serializedN3)
       var res_dydra = Await.result(push2Dydra(serializedN3, ConfigFactory.load.getString("dydra.demand_analysis.graph")+"/"+wrapper.sourceLocalName), Duration.Inf)
       Logger.info("FINISHED: " + x + " - " + y + " - " + res_dydra)
       requestMerger = new RequestMerger()
+      */
+      Logger.info("FINISHED: " + x + " - " + y)
+
     }
 
     Logger.info("FINISHING DEMAND")
@@ -494,7 +502,8 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
     val model = ModelFactory.createDefaultModel()
     val docs = (annotations \ "GateDocument" \ "AnnotationSet").filter(!_.attribute("Name").isEmpty)
     docs.map { r =>
-      val jobPostUri = "http://www.edsa-project.eu/jobpost/" + r.attribute("Name").get
+      val id = r.attribute("Name").get
+      val jobPostUri = "http://www.edsa-project.eu/jobpost/" + id
       var skillId = ""
       (r \ "Annotation" \ "Feature").map { f =>
         val name = (f \ "Name").text
@@ -507,8 +516,12 @@ class WrapperController @Inject()(ws: WSClient) extends Controller {
         }
         else {
           if (skillId != "") {
-            model.createResource("http://www.edsa-project.eu/skill/"+skillId)
-              .addProperty(model.createProperty("http://www.edsa-project.eu/edsa#"+name), value)
+            if (name == "frequencyOfMention")
+              model.createResource("http://www.edsa-project.eu/skill/"+skillId)
+                .addProperty(model.createProperty("http://www.edsa-project.eu/edsa#"+name), value+"^"+id)
+            else
+              model.createResource("http://www.edsa-project.eu/skill/"+skillId)
+                .addProperty(model.createProperty("http://www.edsa-project.eu/edsa#"+name), value)
           }
         }
       }

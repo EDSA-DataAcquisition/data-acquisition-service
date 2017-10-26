@@ -23,7 +23,7 @@ GET     /edsa/rdf2json                                      controllers.de.fuhse
 GET     /assets/*file                                       controllers.Assets.versioned(path="/public", file: Asset)
 
 # QMine
-GET     /qminer/sent                                        controllers.de.fuhsen.engine.QMinerController.send
+GET     /qminer/sent                                        controllers.de.fuhsen.engine.QMinerController.send(date: String, source:String)
 POST    /qminer/receive                                     controllers.de.fuhsen.engine.QMinerController.receive
 
 #Linking Datasets
